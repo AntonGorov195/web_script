@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset='utf-8'>
+    <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+    <title>Wasm</title>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+</head>
+
+<body>
+    <h1> Wasm Scripting </h1>
+    <p>
+        This should print "Hello, world!" from wasm.
+        Recompile the code with build.sh .
+    </p>
+    <script src="wasm_loader.js"></script>
+    <!-- <script type="module" src="index.js"></script> -->
+    <script>DoWasm("main.wasm")</script>
+</body>
+
+</html>
