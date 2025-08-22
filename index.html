@@ -14,9 +14,12 @@
         This should print "Hello, world!" from wasm.
         Recompile the code with build.sh .
     </p>
-    <script src="wasm_loader.js"></script>
+    <button id="btn"> Log </button>
+    <button> Error </button>
+    <script src="wasm_loader2.js"></script>
     <!-- <script type="module" src="index.js"></script> -->
-    <script>DoWasm("main.wasm")</script>
+    <!-- <script>DoWasm("main.wasm")</script> -->
+    <script>ExecWasm("c_web_scripting.wasm")</script>
 </body>
 
 </html>
