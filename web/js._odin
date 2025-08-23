@@ -1,0 +1,42 @@
+package web
+
+JSValue :: distinct int
+ExportFunc :: proc "contextless"(argc: int, #c_vararg argv: ..JSValue) -> JSValue
+
+foreign import "js_odin"
+
+@(default_calling_convention="contextless")
+@(private)
+foreign js_odin {
+    a_wrap_func :: proc(func: JSValue)  --- // read explanation below
+    a_unwrap_func :: proc(func: JSValue) --- // read explanation below
+    a_export_func :: proc(func: ExportFunc) -> JSValue --- // read explanation  below
+    a_invoke :: proc(func: JSValue, args: []JSValue) -> JSValue ---
+
+    a_obj :: proc() -> JSValue ---
+    a_arr :: proc() -> JSValue ---
+    
+    a_get :: proc(obj:JSValue, key: string) -> JSValue ---
+    set :: proc(obj:JSValue, key: string, value: JSValue) ---
+    
+    arr_set :: proc(arr:JSValue, index: int) -> JSValue ---
+    a_arr_get :: proc(arr:JSValue, index: int, val: JSValue) ---
+
+    free::proc(val: JSValue) ---
+}
+
+/*
+    a_export_func - allocates the exported function from the function tables.
+    a_wrap_func - allocate a new variadic function. 
+        it converts temporarily all arguments to jsvalues and calls the inner function with them.
+        Useful for js callbacks such as addEventListener.
+        If we want to invoke an exported function we need a new function with parameter event.
+        Then it wraps the event to a jsvalue calls the wasm function and then frees it.
+        f :: (...jsval) -> jsval
+        g :: (...rawjsval) -> rawjsval
+        wrap(f) -> g 
+    a_unwrap_func - the reverse of a_wrap_func.
+        f :: (...jsval) -> jsval
+        g :: (...rawjsval) -> rawjsval
+        unwrap(g) -> f 
+*/

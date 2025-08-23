@@ -1,5 +1,6 @@
 package main
 
+import "base:runtime"
 import "./web"
 
 main::proc() {
@@ -9,13 +10,15 @@ main::proc() {
         web.console_log("button not found")
         return 
     }
-    web.console_log_int(transmute(int)btn)
+    web.console_log_int(transmute(int)clicked)
     web.alloc_add_on_click(btn, "clicked", nil)
     // _ = web.alloc_add_on_click(btn, "clicked", nil)
     web.console_log(web.inner_text(btn))
 }
 @(export)
-clicked::proc(event: web.JSValue) {
+clicked::proc "contextless"(event: web.JSValue) {
+    context = runtime.default_context()
+    
     target := web.alloc_read_value(event, "target")
     defer web.free_js(target)
 

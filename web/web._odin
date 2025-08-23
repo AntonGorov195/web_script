@@ -1,0 +1,13 @@
+package web
+
+HTMLElement :: JSValue
+
+foreign import "web_odin"
+
+@(default_calling_convention="contextless")
+@(private)
+foreign web_odin {
+    get_window :: proc() ---
+    get_wasm :: proc() ---
+}
+
