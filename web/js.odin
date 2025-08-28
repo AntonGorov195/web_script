@@ -28,8 +28,8 @@ foreign js_odin {
     a_get :: proc(obj:JSValue, key: string) -> JSValue ---
     set :: proc(obj:JSValue, key: string, value: JSValue) ---
     
-    a_arr_get :: proc(arr:JSValue, index: int) -> JSValue ---
-    arr_set :: proc(arr:JSValue, index: int, val: JSValue) ---
+    a_arr_get :: proc(arr: JSValue, index: int) -> JSValue ---
+    arr_set :: proc(arr: JSValue, index: int, val: JSValue) ---
 
     free::proc(val: JSValue) ---
 }
