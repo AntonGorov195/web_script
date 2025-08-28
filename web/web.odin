@@ -100,8 +100,14 @@ EventHandlerData :: struct {
     func: EventHandlerFunc,
     click_func: JSValue, // Used for removing event handlers
 }
-add_event_listener::proc(elem: JSValue, event_name: string, func: EventHandlerFunc, user_data: rawptr = nil) -> ^EventHandlerData {
-    event_data := new(EventHandlerData)
+add_event_listener::proc(
+    elem: JSValue, 
+    event_name: string, 
+    func: EventHandlerFunc, 
+    user_data: rawptr = nil, 
+    allocator := context.allocator) -> ^EventHandlerData 
+{
+    event_data := new(EventHandlerData, allocator=allocator)
     event_data.user_data = user_data
     event_data.func = func
 
@@ -120,13 +126,23 @@ add_event_listener::proc(elem: JSValue, event_name: string, func: EventHandlerFu
     
     return event_data
 }
-// remove_event_listener::proc()
+remove_event_listener::proc(type: string, elem: JSValue, data: ^EventHandlerData) {
+    rm_func := a_get(elem, "removeEventListener")
+    defer free(rm_func)
+    type := a_string(type)
+    defer free(type)
+
+    free(a_invoke(rm_func, { type, data.click_func }))
+}
 @(export)
 _add_event_handler::proc"contextless"(args_arr: JSValue, user_data: rawptr) -> JSValue {
     context = runtime.default_context()
     data := cast(^EventHandlerData)user_data
-    event := a_arr_get(args_arr, 0)
-    defer free(event)
+    jsevent := a_arr_get(args_arr, 0)
+    defer free(jsevent)
+
+    event := JSValue(as_int(jsevent))
+    
 
     data.func(event, data)
     free_all(context.temp_allocator)
