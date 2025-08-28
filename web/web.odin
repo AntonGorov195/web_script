@@ -42,7 +42,7 @@ as_f64 :: proc "c"(val: JSValue) -> f64 {
 as_string :: proc(val: JSValue, allocator := context.allocator) -> string {
     length := get_string_len(val)
     buf := make([]byte, length, allocator = allocator)
-    read_bytes(val, buf)
+    read_string(val, buf)
     return string(buf)
 }
 
@@ -94,17 +94,32 @@ get_input_value_f64::proc(elem: JSValue) -> f64 {
     read_f64(jsval, &value)
     return value
 }
-add_event_listener::proc(elem: JSValue, event_name: string, func: proc(event: JSValue, userData: rawptr)) {
-    addEvent := a_get(elem, "addEventListener")
-    defer free(addEvent)
+EventHandlerFunc :: proc(event: JSValue, data: ^EventHandlerData)
+EventHandlerData :: struct {
+    user_data: rawptr,
+    func: EventHandlerFunc,
+    self: JSValue, // Used for removing event handlers
+}
+add_event_listener::proc(elem: JSValue, event_name: string, handler: EventHandlerFunc, user_data: rawptr = nil) -> ^EventHandlerData {
+    event_data := new(EventHandlerData)
+    event_data.user_data = user_data
+
+    add_event := a_get(elem, "addEventListener")
+    defer free(add_event)
 
     event_name := a_string(event_name)
     defer free(event_name)
 
+    click_export_func := a_export_func(_add_event_handler, user_data)
+    defer free(click_export_func)
 
+    click_func := a_wrap_func(click_export_func)
+    free(a_invoke(add_event, {event_name, click_func}))
+    return event_data
 }
 @(export)
-_add_event_handler::proc"c"(args_arr: JSValue) {
+_add_event_handler::proc"contextless"(args_arr: JSValue, user_data: rawptr) -> JSValue {
     context = runtime.default_context()
 
+    return 0
 }

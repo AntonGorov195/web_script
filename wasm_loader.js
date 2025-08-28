@@ -198,7 +198,7 @@ async function ExecWasm(src, extraImports) {
                     return alloc(wrap);
                 },
                 /** @type {(func_id: ValueId) => ValueId} */
-                a_unwrap_func: function () {
+                a_unwrap_func: function (func_id) {
                     const func = jsval[func_id];
                     const unwrap = (...args_id) => {
                         /** @type {ValueId[]} */
@@ -213,8 +213,8 @@ async function ExecWasm(src, extraImports) {
                 /** @type {(func: number, userData: WasmPtr) => ValueId} */
                 a_export_func: function (func, userData) {
                     const exported = wasm.exports.__indirect_function_table.get(func);
-                    return alloc((...args) => {
-                        const id = alloc(args)
+                    return alloc(function (...args) {
+                        const id = alloc(args);
                         exported(id, userData)
                         free(id)
                     })
@@ -279,7 +279,7 @@ async function ExecWasm(src, extraImports) {
                     return textEncoder.encode(val).length;
                 },
                 /** @type {() => ValueId} */
-                get_global_this: function() {
+                get_global_this: function () {
                     return GLOBAL_THIS_ID;
                 },
                 /** @type {(id: ValueId, key_ptr: WasmPtr, key_len: number) => ValueId} */
@@ -287,7 +287,7 @@ async function ExecWasm(src, extraImports) {
                     const val = jsval[id];
                     const key = wasm.reader.String(key_ptr, key_len);
                     let out = val[key];
-                    if(typeof out === 'function') {
+                    if (typeof out === 'function') {
                         out = val[key].bind(val);
                     }
                     return alloc(out);

@@ -1,7 +1,7 @@
 package web
 
 JSValue :: distinct int
-ExportFunc :: proc "c"(args_arr: JSValue, user_data: rawptr) -> JSValue
+ExportFunc :: proc "contextless"(args_arr: JSValue, user_data: rawptr) -> JSValue
 
 foreign import "js_odin"
 
@@ -20,7 +20,7 @@ foreign js_odin {
     
     read_int :: proc(val: JSValue, out: ^int) ---
     read_f64 :: proc(val: JSValue, out: ^f64) ---
-    read_bytes :: proc(val: JSValue, buf: []byte) ---
+    read_string :: proc(val: JSValue, buf: []byte) ---
     
     get_string_len :: proc(val: JSValue) -> int --- // in bytes
     get_global_this :: proc() -> JSValue ---
