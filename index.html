@@ -14,11 +14,36 @@
         This should print "Hello, world!" from wasm.
         Recompile the code with build.sh .
     </p>
+    <details>
+        <summary>This is a TODO list</summary>
+        <div>
+            <h3> JS </h3>
+            <div style="display: flex;">
+                <input id="todo-input-js" type="text">
+                <button id="todo-add-btn-js"> Add </button>
+            </div>
+            <ol id="todo-list-js">
+                <!-- <li> Todo 1 <button> Remove </button></li>
+            <li> Todo 2 <button> Remove </button></li> -->
+            </ol>
+        </div>        
+        <div>
+            <h3> WASM </h3>
+            <div style="display: flex;">
+                <input id="todo-input-wasm" type="text">
+                <button id="todo-add-btn-wasm"> Add </button>
+            </div>
+            <ol id="todo-list-wasm">
+                <!-- <li> Todo 1 <button> Remove </button></li>
+            <li> Todo 2 <button> Remove </button></li> -->
+            </ol>
+        </div>
+    </details>
     <button id="btn"> Log </button>
     <button> Error </button>
+    <script src="todo/todo.js"></script>
     <script src="wasm_loader.js"></script>
-    <!-- <script type="module" src="index.js"></script> -->
-    <!-- <script>DoWasm("main.wasm")</script> -->
+    <!-- <script>ExecWasm("todo/main.wasm")</script> -->
     <script>ExecWasm("main.wasm")</script>
 </body>
 

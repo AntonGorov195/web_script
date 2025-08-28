@@ -27,6 +27,8 @@
  *      UInt64: (ptr: WasmPtr) => number,
  *      Int: (ptr: WasmPtr) => number,
  *      UInt: (ptr: WasmPtr) => number,
+ *      F32: (ptr: WasmPtr) => number,
+ *      F64: (ptr: WasmPtr) => number,
  * }} WasmReader
  * @typedef {{ 
  *      String: (val: string, dst: WasmPtr) => number, 
@@ -40,6 +42,8 @@
  *      UInt64: (val: number, dst: WasmPtr) => void,
  *      Int: (val: number, dst: WasmPtr) => void,
  *      UInt: (val: number, dst: WasmPtr) => void,
+ *      F32: (val: number, dst: WasmPtr) => void,
+ *      F64: (val: number, dst: WasmPtr) => void,
  * }} WasmWriter
  * @typedef {{ 
  *      vals: any[], 
@@ -107,8 +111,12 @@ async function ExecWasm(src, extraImports) {
                 wasm.jsmem.freeList.push(id);
             },
         };
-        wasm.jsmem.alloc(null);
-        const WINDOW_ID = wasm.jsmem.alloc(window);
+        const alloc = wasm.jsmem.alloc;
+        const free = wasm.jsmem.free;
+        const jsval = wasm.jsmem.vals;
+        alloc(null);
+        const GLOBAL_THIS_ID = alloc(globalThis);
+        const WASM_DATA_ID = alloc(wasm);
         wasm.view = function () { return new DataView(wasm.mem.buffer) };
         wasm.reader = {
             Bytes: (ptr, len) => {
@@ -128,6 +136,8 @@ async function ExecWasm(src, extraImports) {
             UInt64: function (ptr) { return wasm.view().getUint64(ptr, true) },
             Int: function (ptr) { return wasm.intSize === 4 ? this.Int32(ptr) : this.Int64(ptr) },
             UInt: function (ptr) { return wasm.intSize === 4 ? this.UInt32(ptr) : this.UInt64(ptr) },
+            F32: function (ptr) { return wasm.view().getFloat32(ptr, true) },
+            F64: function (ptr) { return wasm.view().getFloat64(ptr, true) },
         }
         wasm.writer = {
             // Return length will differ on ascii
@@ -146,11 +156,13 @@ async function ExecWasm(src, extraImports) {
             UInt32: function (val, ptr) { wasm.view().setUint32(ptr, val, true) },
             Int64: function (val, ptr) { wasm.view().setInt64(ptr, val, true) },
             UInt64: function (val, ptr) { wasm.view().setUint64(ptr, val, true) },
-            Int: function (val, ptr) { wasm.intSize === 4 ? this.Int32(ptr, val) : this.Int64(ptr, val) },
-            UInt: function (val, ptr) { wasm.intSize === 4 ? this.UInt32(ptr, val) : this.UInt64(ptr, val) },
+            Int: function (val, ptr) { wasm.intSize === 4 ? this.Int32(val, ptr) : this.Int64(val, ptr) },
+            UInt: function (val, ptr) { wasm.intSize === 4 ? this.UInt32(val, ptr) : this.UInt64(val, ptr) },
+            F32: function (val, ptr) { return wasm.view().setFloat32(ptr, val, true) },
+            F64: function (val, ptr) { return wasm.view().setFloat64(ptr, val, true) },
         }
         wasm.imports = {
-            env: {
+            js: {
                 memory: wasm.mem,
             },
             odin_env: {
@@ -167,116 +179,145 @@ async function ExecWasm(src, extraImports) {
                     }
                 },
             },
-            web_odin: {
-                /** @type {(ptr: WasmPtr, len: number) => void} */
-                _console_log: function (ptr, len) { console.log(wasm.reader.String(ptr, len)) },
-                /** @type {(val: number) => void} */
-                _console_log_int: function (num) { console.log(num) },
-
-                /** @type {(id_ptr: WasmPtr, id_len: number) => ValueId} */
-                _alloc_element_by_id: function (id_ptr, id_len) {
-                    const id = wasm.reader.String(id_ptr, id_len)
-                    const elem = document.getElementById(id);
-                    return wasm.jsmem.alloc(elem)
-                },
-                /** @type {(btn_id:ValueId, func_id: ValueId) => void} */
-                _add_click_lister: function (btn_id, func_id) {
-                    /** @type {(event: MouseEvent, ctx: WasmPtr) => void} */
-                    // TODO: type checking
-                    const func = wasm.jsmem.vals[func_id];
-                    const handler = (e) => {
-                        const e_id = wasm.jsmem.alloc(e);
-                        func(e_id, wasm.exports.default_context_ptr())
-                        wasm.jsmem.free(e_id);
-                    }
-                    wasm.jsmem.vals[btn_id].addEventListener("click", handler)
-                },
-                /** @type {(id: ValueId) => number} */
-                _value_string_len_bytes: function (id) {
-                    /** @type {string} */
-                    const str = wasm.jsmem.vals[id];
-                    if (typeof str !== "string") {
-                        return -1;
-                    }
-                    const textEncoder = new TextEncoder();
-                    return textEncoder.encode(str).length;
-                },
-                /** @type {(id: ValueId, buf: WasmPtr) => number} */
-                _read_value_string: function (id, buf) {
-                    const str = wasm.jsmem.vals[id];
-                    if (typeof str !== "string") {
-                        return -1;
-                    }
-                    wasm.writer.String(str, buf);
-                },
-                /** @type {(id: ValueId) => number} */
-                _read_int: function (id) {
-                    console.error("Not implemented _read_int");
-                },
-                /** @type {(id: ValueId, ptr: WasmPtr, len: number) => ValueId} */
-                _alloc_read_value: function (id, ptr, len) {
-                    const key = wasm.reader.String(ptr, len);
-                    const value = wasm.jsmem.vals[id]
-                    return wasm.jsmem.alloc(value[key])
-                },
-                /** @type {(val: number)=>ValueId} */
-                _alloc_empty_array: function () { return wasm.jsmem.alloc([]) },
-                /** @type {(val: number)=>ValueId} */
-                _alloc_empty_obj: function () { return wasm.jsmem.alloc({}) },
-                /** @type {(val: number)=>ValueId} */
-                _alloc_int: function (val) { return wasm.jsmem.alloc(val) },
-                /** @type {(id_ptr: WasmPtr, id_len: number)=>ValueId} */
-                _alloc_string: function (ptr, len) { return wasm.jsmem.alloc(wasm.reader.String(ptr, len)) },
-                /** @type {(name_ptr: WasmPtr, name_len: number)=>ValueId} */
-                _alloc_export_func: function (name_ptr, name_len) {
-                    const name = wasm.reader.String(name_ptr, name_len);
-                    return wasm.jsmem.alloc(wasm.exports[name]);
-                },
-                /** @type {(id: ValueId) => void} */
-                _free_js: function (id) { wasm.jsmem.free(id) },
-                /** @type {() => ValueId} */
-                _get_window: function () {
-                    return WINDOW_ID;
-                },
-                /** @type {(arr_id: ValueId, item_id: ValueId)} */
-                _push_array: function (arr_id, item_id) {
-                    wasm.jsmem.vals[arr_id].push(wasm.jsmem.vals[item_id]);
-                },
-                /**
-                 * Takes a function and allocates a new one.
-                 * The new function converts all args into JSValues and calls the input function.
-                 * The args are allocated temporarily.
-                 * @type {(func_id: ValueId) => ValueId} 
-                 */
-                _alloc_wrapper_func: function (func_id) {
-                    const func = wasm.jsmem.vals[func_id];
-                    const wrapper = (...args) => {
-                        const args_as_id = [];
+            js_odin: {
+                /** @type {(func_id: ValueId) => ValueId} */
+                a_wrap_func: function (func_id) {
+                    const func = jsval[func_id];
+                    const wrap = (...args) => {
+                        /** @type {ValueId[]} */
+                        const args_id = [];
                         for (let i = 0; i < args.length; i++) {
-                            const arg_id = wasm.jsmem.alloc(args[i]);
-                            args_as_id.push(arg_id);
+                            args_id.push(alloc(args[i]));
                         }
-                        func(...args_as_id)
-                        for (let i = 0; i < args.length; i++) {
-                            wasm.jsmem.free(args_as_id[i]);
+                        const out = func(...args_id);
+                        for (let i = 0; i < args_id.length; i++) {
+                            free(args_id[i]);
                         }
+                        return out;
                     }
-                    return wasm.jsmem.alloc(wrapper);
+                    return alloc(wrap);
                 },
-                /**
-                 * args points to an array of JSValues.
-                 * Unwrap them and call the function with them. 
-                 * @type {(func_id: ValueId, args_ptr: WasmPtr, args_len: number) => ValueId} 
-                 * */
-                _alloc_unwrapper_func: function (func_id, args_ptr, args_len) {
-                    const func = wasm.jsmem.vals[func_id];
+                /** @type {(func_id: ValueId) => ValueId} */
+                a_unwrap_func: function () {
+                    const func = jsval[func_id];
+                    const unwrap = (...args_id) => {
+                        /** @type {ValueId[]} */
+                        const args = [];
+                        for (let i = 0; i < args_id.length; i++) {
+                            args.push(jsval[args_id[i]])
+                        }
+                        return func(...args);
+                    }
+                    return alloc(unwrap);
+                },
+                /** @type {(func: number, userData: WasmPtr) => ValueId} */
+                a_export_func: function (func, userData) {
+                    const exported = wasm.exports.__indirect_function_table.get(func);
+                    return alloc((...args) => {
+                        const id = alloc(args)
+                        exported(id, userData)
+                        free(id)
+                    })
+                },
+                /** @type {(func_id: ValueId, args_ptr: WasmPtr, args_len: number) => ValueId} */
+                a_invoke: function (func_id, args_ptr, args_len) {
+                    const func = jsval[func_id]
                     const args = [];
                     for (let i = 0; i < args_len; i++) {
-                        const id = wasm.reader.UInt(args_ptr + i * wasm.intSize);
-                        args.push(wasm.jsmem.vals[id]);
+                        const arg_ptr = args_ptr + i * wasm.intSize;
+                        const arg_id = wasm.reader.UInt(arg_ptr);
+                        const arg = jsval[arg_id];
+                        args.push(arg);
                     }
-                    return wasm.jsmem.alloc(func(...args));
+                    // return alloc(func.call(func._bound, ...args));
+                    // func.bind(func._bound);
+                    return alloc(func(...args));
                 },
+                /** @type {(func_id: ValueId, args_ptr: WasmPtr, args_len: number) => ValueId} */
+                a_invoke_await: async function (func_id, args_ptr, args_len) {
+                    const func = jsval[func_id]
+                    const args = [];
+                    for (let i = 0; i < args_len; i++) {
+                        const arg_ptr = args_ptr + i * wasm.intSize;
+                        const arg_id = wasm.reader.UInt(arg_ptr);
+                        const arg = jsval[arg_id];
+                        args.push(arg);
+                    }
+                    // return alloc(func.call(func._bound, ...args));
+                    // func.bind(func._bound);
+                    return alloc(await func(...args));
+                },
+                /** @type {(ptr: WasmPtr, len: number) => ValueId} */
+                a_string: function (ptr, len) { return alloc(wasm.reader.String(ptr, len)) },
+                /** @type {(ptr: WasmPtr) => ValueId} */
+                a_int: function (ptr) { return alloc(wasm.reader.Int(ptr)) },
+                /** @type {(ptr: WasmPtr) => ValueId} */
+                a_f64: function (ptr) { return alloc(wasm.reader.F64(ptr)) },
+                /** @type {() => ValueId} */
+                a_obj: function () { return alloc({}) },
+                /** @type {() => ValueId} */
+                a_arr: function () { return alloc([]) },
+                /** @type {(id: ValueId, dst: WasmPtr) => void} */
+                read_string: function (id, dst) {
+                    const val = jsval[id];
+                    wasm.writer.String(val, dst)
+                },
+                /** @type {(id: ValueId, dst: WasmPtr) => void} */
+                read_int: function (id, dst) {
+                    const val = jsval[id];
+                    wasm.writer.Int(val, dst)
+                },
+                /** @type {(id: ValueId, dst: WasmPtr) => void} */
+                read_f64: function (id, dst) {
+                    const val = jsval[id];
+                    wasm.writer.F64(val, dst)
+                },
+                /** @type {(id: ValueId) => number} */
+                get_string_len: function (id) {
+                    const val = jsval[id];
+                    const textEncoder = new TextEncoder();
+                    return textEncoder.encode(val).length;
+                },
+                /** @type {() => ValueId} */
+                get_global_this: function() {
+                    return GLOBAL_THIS_ID;
+                },
+                /** @type {(id: ValueId, key_ptr: WasmPtr, key_len: number) => ValueId} */
+                a_get: function (id, key_ptr, key_len) {
+                    const val = jsval[id];
+                    const key = wasm.reader.String(key_ptr, key_len);
+                    let out = val[key];
+                    if(typeof out === 'function') {
+                        out = val[key].bind(val);
+                    }
+                    return alloc(out);
+                },
+                /** @type {(id: ValueId, key_ptr: WasmPtr, key_len: number, input_id: ValueId) => ValueId} */
+                set: function (id, key_ptr, key_len, input_id) {
+                    const val = jsval[id];
+                    const key = wasm.reader.String(key_ptr, key_len);
+                    val[key] = jsval[input_id];
+                },
+                /** @type {(id: ValueId, i: number) => ValueId} */
+                a_arr_get: function (id, i) {
+                    const val = jsval[id];
+                    return alloc(val[i]);
+                },
+                /** @type {(id: ValueId, i: number, input_id: ValueId) => void} */
+                arr_set: function (id, i, input_id) {
+                    const val = jsval[id];
+                    val[i] = jsval[input_id];
+                },
+                /** @type {(id: ValueId) => void} */
+                free: function (id) {
+                    free(id);
+                }
+            },
+            web_odin: {
+                /** @type {() => ValueId} */
+                get_wasm: function () { return WASM_DATA_ID; },
+                log_str: function (ptr, len) { console.log(wasm.reader.String(ptr, len)) },
+                log_int: function (num) { console.log(num) },
             },
             ...extraImports,
         };

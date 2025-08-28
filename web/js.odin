@@ -1,26 +1,35 @@
 package web
 
 JSValue :: distinct int
-ExportFunc :: proc "contextless"(argc: int, #c_vararg argv: ..JSValue) -> JSValue
+ExportFunc :: proc "c"(args_arr: JSValue, user_data: rawptr) -> JSValue
 
 foreign import "js_odin"
 
 @(default_calling_convention="contextless")
-@(private)
 foreign js_odin {
-    a_wrap_func :: proc(func: JSValue)  --- // read explanation below
-    a_unwrap_func :: proc(func: JSValue) --- // read explanation below
-    a_export_func :: proc(func: ExportFunc) -> JSValue --- // read explanation  below
+    a_wrap_func :: proc(func: JSValue) -> JSValue --- // read explanation below
+    a_unwrap_func :: proc(func: JSValue) -> JSValue--- // read explanation below
+    a_export_func :: proc(func: ExportFunc, user_data: rawptr) -> JSValue --- // read explanation  below
     a_invoke :: proc(func: JSValue, args: []JSValue) -> JSValue ---
 
-    a_obj :: proc() -> JSValue ---
-    a_arr :: proc() -> JSValue ---
+    a_string :: proc(val: string) -> JSValue ---
+    a_int :: proc(val: ^int) -> JSValue ---
+    a_f64 :: proc(val: ^f64) -> JSValue ---
+    a_obj :: proc() -> JSValue --- // empty object
+    a_arr :: proc() -> JSValue --- // empty array
     
+    read_int :: proc(val: JSValue, out: ^int) ---
+    read_f64 :: proc(val: JSValue, out: ^f64) ---
+    read_bytes :: proc(val: JSValue, buf: []byte) ---
+    
+    get_string_len :: proc(val: JSValue) -> int --- // in bytes
+    get_global_this :: proc() -> JSValue ---
+
     a_get :: proc(obj:JSValue, key: string) -> JSValue ---
     set :: proc(obj:JSValue, key: string, value: JSValue) ---
     
-    arr_set :: proc(arr:JSValue, index: int) -> JSValue ---
-    a_arr_get :: proc(arr:JSValue, index: int, val: JSValue) ---
+    a_arr_get :: proc(arr:JSValue, index: int) -> JSValue ---
+    arr_set :: proc(arr:JSValue, index: int, val: JSValue) ---
 
     free::proc(val: JSValue) ---
 }
